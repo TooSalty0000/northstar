@@ -12,3 +12,6 @@ packages/app/release/
 # local env
 .env
 .env.local
+# locally-installed agent skills (tooling, not app code)
+.claude/
+skills-lock.json
