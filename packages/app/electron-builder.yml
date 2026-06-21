@@ -1,0 +1,57 @@
+appId: com.toosalty.northstar
+productName: NORTHSTAR
+# npm-workspaces hoists `electron` to the root node_modules, so electron-builder
+# (run from packages/app) can't auto-detect it — pin the version explicitly.
+electronVersion: 33.4.11
+directories:
+  output: release          # -> packages/app/release/
+  buildResources: build    # -> packages/app/build/ (icons optional)
+
+# We own the sidecar's native deps (staged at the exact ABI). Forbid rebuilds.
+npmRebuild: false
+asar: true
+# Inert safety net: the main bundle has no native deps. The real guarantee is
+# extraResources placing the addon OUTSIDE asar.
+asarUnpack:
+  - "**/*.node"
+
+files:
+  - out/**/*               # electron-vite output: main/preload/renderer (everything is bundled)
+  - package.json
+  # The app needs NO node_modules at runtime (main/preload/renderer are bundled by
+  # electron-vite; the sidecar ships its own deps via extraResources). Excluding them
+  # avoids electron-builder choking on the symlinked @northstar/shared workspace package.
+  - "!node_modules/**/*"
+
+extraResources:
+  # 1) standalone Node 22 (ABI 127) -> Resources/node/bin/node  (matches supervisor.nodeBin)
+  - from: build/runtime/node-darwin-arm64
+    to: node
+    filter: ["**/*"]
+  # 2) server bundle -> Resources/server/index.mjs  (matches supervisor.serverEntry)
+  - from: ../server/dist
+    to: server
+    filter: ["index.mjs"]
+  # 3) server-scoped prod node_modules (better-sqlite3 ABI-127 + bindings + file-uri-to-path)
+  - from: build/runtime/server-node_modules
+    to: server/node_modules
+    filter: ["**/*"]
+
+mac:
+  category: public.app-category.productivity
+  target:
+    - target: dmg
+      arch: [arm64]
+  identity: '-'            # ad-hoc sign: arm64 main binary needs SOME signature to run
+  hardenedRuntime: false   # unsigned + hardenedRuntime:true can block launch
+  gatekeeperAssess: false
+  artifactName: ${productName}-${version}-${arch}.${ext}
+
+dmg:
+  artifactName: ${productName}-${version}-${arch}.${ext}
+
+publish:
+  provider: github
+  owner: TooSalty0000
+  repo: northstar
+  releaseType: release     # publish live so the in-app notifier (anon API) can see it

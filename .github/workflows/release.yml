@@ -1,0 +1,46 @@
+name: release
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write # electron-builder creates/uploads the GitHub Release
+
+jobs:
+  release-macos:
+    runs-on: macos-14 # Apple Silicon / arm64 native
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22 # ABI 127 — matches the better-sqlite3 prebuild AND the shipped node binary
+          cache: npm
+
+      - name: Install (workspaces)
+        run: npm ci # pulls the better-sqlite3 Node-22/ABI-127 prebuild into root node_modules
+
+      - name: Assert tag == app version
+        run: |
+          APP_VER="$(node -p "require('./packages/app/package.json').version")"
+          if [ "v$APP_VER" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::tag $GITHUB_REF_NAME != app version v$APP_VER"
+            exit 1
+          fi
+
+      - name: Build (shared + server + app)
+        run: npm run build
+
+      - name: Stage runtime (download node 22 + stage server node_modules + ABI assert)
+        run: npm run prepare:runtime
+
+      - name: Build & publish .dmg
+        working-directory: packages/app
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_IDENTITY_AUTO_DISCOVERY: "false" # unsigned: no keychain lookup
+          CSC_LINK: ""
+          CSC_KEY_PASSWORD: ""
+        run: npx electron-builder --config electron-builder.yml --mac --arm64 --publish always

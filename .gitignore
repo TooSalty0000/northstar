@@ -6,6 +6,8 @@ out/
 .DS_Store
 # build artifacts
 release/
+packages/app/build/runtime/
+packages/app/release/
 *.tsbuildinfo
 # local env
 .env

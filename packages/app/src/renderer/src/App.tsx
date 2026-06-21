@@ -9,6 +9,7 @@ import { ProductivityView } from "./views/ProductivityView";
 import { ConnectionsView } from "./views/ConnectionsView";
 import { TaskDrawer } from "./components/TaskDrawer";
 import { SpaceSwitcher } from "./components/SpaceSwitcher";
+import { UpdateBanner } from "./components/UpdateBanner";
 
 const NAV: { id: View; label: string; ico: string }[] = [
   { id: "today", label: "Today", ico: "✦" },
@@ -68,6 +69,7 @@ export function App() {
       </aside>
 
       <main className="main">
+        <UpdateBanner />
         {view === "today" && <TodayView />}
         {view === "board" && <BoardView />}
         {view === "report" && <ReportView />}

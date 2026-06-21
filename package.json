@@ -16,6 +16,8 @@
     "build:server": "npm -w @northstar/server run build",
     "build:app": "npm -w @northstar/app run build",
     "build": "npm run build:shared && npm run build:server && npm run build:app",
+    "prepare:runtime": "node packages/app/scripts/prepare-runtime.mjs",
+    "dist": "npm run build && npm run prepare:runtime && CSC_IDENTITY_AUTO_DISCOVERY=false npm -w @northstar/app run dist:builder",
     "test": "npm -w @northstar/server run test",
     "typecheck": "tsc -b"
   },

@@ -5,6 +5,7 @@ import { createMainWindow, createHotfixWindow } from "./windows";
 import { createTray, refreshTray } from "./tray";
 import { addRepo, removeRepo } from "./repoSetup";
 import { connectJira, disconnectJira, restoreJiraSessions } from "./jiraCredentials";
+import { initUpdater } from "./updater";
 
 const supervisor = new ServerSupervisor();
 let mainWindow: BrowserWindow | null = null;
@@ -79,10 +80,15 @@ app.whenReady().then(() => {
   app.dock?.hide(); // LSUIElement-style menu-bar agent
 
   supervisor.on("status", broadcastStatus);
+  supervisor.on("fatal", async (err: Error) => {
+    const { dialog } = await import("electron");
+    dialog.showErrorBox("Northstar server failed", String(err?.message ?? err));
+  });
   supervisor.start();
 
   mainWindow = createMainWindow();
   wireMainWindow();
+  initUpdater(() => mainWindow); // in-app "update available" notifier (packaged only)
 
   createTray({
     onOpen: showMain,

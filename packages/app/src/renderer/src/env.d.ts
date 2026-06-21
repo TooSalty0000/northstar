@@ -2,6 +2,14 @@
 import type { ServerStatus } from "@northstar/shared";
 
 declare global {
+  interface UpdateInfo {
+    version: string;
+    tag: string;
+    name: string;
+    notes: string;
+    url: string;
+    publishedAt: string;
+  }
   interface Window {
     northstar?: {
       apiBase: string;
@@ -16,6 +24,9 @@ declare global {
         creds: { siteUrl: string; email: string; token: string },
       ) => Promise<{ ok: boolean; accountId?: string; displayName?: string; error?: string }>;
       jiraDisconnect: (spaceId: string) => Promise<{ ok: boolean }>;
+      checkForUpdate: () => Promise<UpdateInfo | null>;
+      onUpdateAvailable: (cb: (info: UpdateInfo) => void) => () => void;
+      openUpdateUrl: (url: string) => Promise<{ ok: boolean }>;
       closeHotfix: () => void;
       navigate: (cb: (route: string) => void) => () => void;
     };

@@ -24,6 +24,13 @@ const api = {
   ): Promise<{ ok: boolean; accountId?: string; displayName?: string; error?: string }> =>
     ipcRenderer.invoke("jira:connect", spaceId, creds),
   jiraDisconnect: (spaceId: string): Promise<{ ok: boolean }> => ipcRenderer.invoke("jira:disconnect", spaceId),
+  checkForUpdate: () => ipcRenderer.invoke("update:check"),
+  onUpdateAvailable: (cb: (info: unknown) => void) => {
+    const handler = (_e: unknown, info: unknown) => cb(info);
+    ipcRenderer.on("update:available", handler);
+    return () => ipcRenderer.removeListener("update:available", handler);
+  },
+  openUpdateUrl: (url: string) => ipcRenderer.invoke("update:open", url),
   closeHotfix: () => ipcRenderer.send("hotfix:close"),
   navigate: (cb: (route: string) => void) => {
     const handler = (_e: unknown, route: string) => cb(route);

@@ -64,9 +64,35 @@ export class ServerSupervisor extends EventEmitter {
     return process.env.NORTHSTAR_NODE || "node";
   }
 
+  /** extraResources copy can drop the +x bit on the bundled node binary. */
+  private ensureNodeExecutable(node: string) {
+    if (app.isPackaged) {
+      try {
+        fs.chmodSync(node, 0o755);
+      } catch {
+        /* best-effort */
+      }
+    }
+  }
+
   private spawnChild() {
     const entry = this.serverEntry();
     const node = this.nodeBin();
+
+    // Pre-flight: in a packaged app, missing artifacts would otherwise hot-loop the
+    // respawn logic forever. Bail out loudly instead.
+    if (app.isPackaged) {
+      for (const p of [node, entry]) {
+        if (!fs.existsSync(p)) {
+          console.error("[supervisor] missing packaged artifact:", p);
+          this.setStatus("crashed");
+          this.emit("fatal", new Error(`missing artifact: ${p}`));
+          return;
+        }
+      }
+      this.ensureNodeExecutable(node);
+    }
+
     this.setStatus("starting");
 
     const child = spawn(node, [entry], {
@@ -100,6 +126,11 @@ export class ServerSupervisor extends EventEmitter {
         return;
       }
       this.setStatus("crashed");
+      if (this.restarts > 5) {
+        console.error("[supervisor] server crashed >5x; giving up");
+        this.emit("fatal", new Error("server crashed >5x; giving up"));
+        return;
+      }
       const delay = Math.min(1500 * (this.restarts + 1), 8000);
       this.restarts++;
       console.warn(`[supervisor] server exited (code=${code} signal=${signal}); restarting in ${delay}ms`);
