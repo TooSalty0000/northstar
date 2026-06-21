@@ -41,6 +41,6 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: "false" # unsigned: no keychain lookup
-          CSC_LINK: ""
-          CSC_KEY_PASSWORD: ""
+          # NOTE: do NOT set CSC_LINK / CSC_KEY_PASSWORD — even empty strings make
+          # electron-builder attempt signing ("empty password will be used") and fail.
         run: npx electron-builder --config electron-builder.yml --mac --arm64 --publish always
