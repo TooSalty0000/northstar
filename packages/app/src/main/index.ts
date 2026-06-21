@@ -1,5 +1,6 @@
 import { app, BrowserWindow, globalShortcut, ipcMain } from "electron";
-import { MCP_URL } from "@northstar/shared";
+import { resolveMcpUrl } from "@northstar/shared";
+const MCP_URL = resolveMcpUrl();
 import { ServerSupervisor } from "./supervisor";
 import { createMainWindow, createHotfixWindow } from "./windows";
 import { createTray, refreshTray } from "./tray";

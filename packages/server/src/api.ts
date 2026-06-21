@@ -1,5 +1,7 @@
 import express, { type NextFunction, type Request, type Response } from "express";
-import { NORTHSTAR_HOST, NORTHSTAR_PORT } from "@northstar/shared";
+import { NORTHSTAR_HOST, resolvePort } from "@northstar/shared";
+
+const PORT = resolvePort();
 import { NONCE, STARTED_AT, VERSION } from "./config";
 import { handleMcp } from "./mcp";
 import * as store from "./store/tasks";
@@ -17,8 +19,8 @@ function spaceParam(req: Request): string | undefined {
 }
 
 const ALLOWED_HOSTS = new Set([
-  `${NORTHSTAR_HOST}:${NORTHSTAR_PORT}`,
-  `localhost:${NORTHSTAR_PORT}`,
+  `${NORTHSTAR_HOST}:${PORT}`,
+  `localhost:${PORT}`,
 ]);
 
 // DNS-rebinding guard: only accept requests whose Host targets our loopback endpoint.

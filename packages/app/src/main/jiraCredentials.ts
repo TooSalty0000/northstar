@@ -2,7 +2,8 @@ import { safeStorage } from "electron";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { API_BASE } from "@northstar/shared";
+import { resolveApiBase } from "@northstar/shared";
+const API_BASE = resolveApiBase();
 
 interface Creds {
   siteUrl: string;

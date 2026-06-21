@@ -7,8 +7,26 @@
 export const NORTHSTAR_HOST = "127.0.0.1";
 export const NORTHSTAR_PORT = 7777;
 export const MCP_PATH = "/mcp";
+/** Fixed production endpoint — used in the .mcp.json written into work repos (always prod). */
 export const API_BASE = `http://${NORTHSTAR_HOST}:${NORTHSTAR_PORT}`;
 export const MCP_URL = `${API_BASE}${MCP_PATH}`;
+
+/**
+ * Runtime-resolved port. A dev profile sets NORTHSTAR_PORT (e.g. 7788) so the dev
+ * app never collides with the installed production app on 7777. Safe in browser
+ * (no process) — falls back to the default there.
+ */
+export function resolvePort(): number {
+  const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.NORTHSTAR_PORT;
+  const p = Number(env);
+  return Number.isFinite(p) && p > 0 ? p : NORTHSTAR_PORT;
+}
+export function resolveApiBase(): string {
+  return `http://${NORTHSTAR_HOST}:${resolvePort()}`;
+}
+export function resolveMcpUrl(): string {
+  return `${resolveApiBase()}${MCP_PATH}`;
+}
 
 // ---- product tuning (locked in spec §4.2 / §9) ----
 /** Day boundary offset: a "day" runs 04:00 → next 04:00 local (late-night work counts to the day it started). */

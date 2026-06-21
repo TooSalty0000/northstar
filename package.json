@@ -1,7 +1,7 @@
 {
   "name": "northstar",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Local-first accomplishment tracker that Claude keeps current as a side effect of real work.",
   "workspaces": [
     "packages/shared",
@@ -11,7 +11,7 @@
   "scripts": {
     "dev": "concurrently -k -n server,app -c green,magenta \"npm:dev:server\" \"npm:dev:app\"",
     "dev:server": "npm -w @northstar/server run dev",
-    "dev:app": "wait-on packages/server/dist/index.mjs && npm -w @northstar/app run dev",
+    "dev:app": "wait-on packages/server/dist/index.mjs && NORTHSTAR_PORT=7788 NORTHSTAR_DATA_DIR=\"$HOME/Library/Application Support/Northstar-dev\" npm -w @northstar/app run dev",
     "build:shared": "npm -w @northstar/shared run build",
     "build:server": "npm -w @northstar/server run build",
     "build:app": "npm -w @northstar/app run build",

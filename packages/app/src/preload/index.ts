@@ -1,9 +1,9 @@
 import { contextBridge, ipcRenderer } from "electron";
-import { API_BASE } from "@northstar/shared";
+import { resolveApiBase } from "@northstar/shared";
 import type { ServerStatus } from "@northstar/shared";
 
 const api = {
-  apiBase: API_BASE,
+  apiBase: resolveApiBase(),
   /** Is this window the compact hotfix capture window? */
   isHotfixWindow: () => location.hash.includes("hotfix"),
   getServerStatus: (): Promise<ServerStatus> => ipcRenderer.invoke("server:status"),

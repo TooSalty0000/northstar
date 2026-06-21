@@ -1,7 +1,11 @@
 import { dialog } from "electron";
 import fs from "node:fs";
 import path from "node:path";
-import { API_BASE, MCP_URL } from "@northstar/shared";
+import { MCP_URL, resolveApiBase } from "@northstar/shared";
+
+// .mcp.json written into work repos always targets the PRODUCTION endpoint (MCP_URL,
+// :7777) — that's the daily-driver app. The registry fetch talks to THIS running app.
+const API_BASE = resolveApiBase();
 import { SKILL_MD } from "./repoTemplates";
 
 const NORTHSTAR_ENTRY = { type: "http", url: MCP_URL };

@@ -1,5 +1,7 @@
 import http from "node:http";
-import { NORTHSTAR_HOST, NORTHSTAR_PORT } from "@northstar/shared";
+import { NORTHSTAR_HOST, resolvePort } from "@northstar/shared";
+
+const PORT = resolvePort();
 import { NONCE, VERSION } from "./config";
 import { createApp } from "./api";
 import { backup, closeDb, getDb } from "./db";
@@ -48,7 +50,7 @@ function watchParentDeath() {
 async function probeExisting(): Promise<boolean> {
   return new Promise((resolve) => {
     const req = http.get(
-      { host: NORTHSTAR_HOST, port: NORTHSTAR_PORT, path: "/api/health", timeout: 1000 },
+      { host: NORTHSTAR_HOST, port: PORT, path: "/api/health", timeout: 1000 },
       (res) => {
         let body = "";
         res.on("data", (c) => (body += c));
@@ -79,8 +81,8 @@ function main() {
       const alive = await probeExisting();
       console.error(
         alive
-          ? `[northstar-server] port ${NORTHSTAR_PORT} already serves a live Northstar — exiting.`
-          : `[northstar-server] port ${NORTHSTAR_PORT} busy by a non-Northstar/stale process — exiting.`,
+          ? `[northstar-server] port ${PORT} already serves a live Northstar — exiting.`
+          : `[northstar-server] port ${PORT} busy by a non-Northstar/stale process — exiting.`,
       );
       process.exit(alive ? 0 : 1);
     } else {
@@ -89,8 +91,8 @@ function main() {
     }
   });
 
-  server.listen(NORTHSTAR_PORT, NORTHSTAR_HOST, () => {
-    console.log(`[northstar-server] v${VERSION} listening on http://${NORTHSTAR_HOST}:${NORTHSTAR_PORT} (nonce ${NONCE.slice(0, 8)})`);
+  server.listen(PORT, NORTHSTAR_HOST, () => {
+    console.log(`[northstar-server] v${VERSION} listening on http://${NORTHSTAR_HOST}:${PORT} (nonce ${NONCE.slice(0, 8)})`);
   });
 
   // nightly-ish backup (every 6h) + on shutdown
