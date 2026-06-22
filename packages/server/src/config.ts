@@ -4,7 +4,9 @@ import fs from "node:fs";
 import { randomUUID } from "node:crypto";
 import { DEFAULT_DAY_START_HOUR } from "@northstar/shared";
 
-export const VERSION = "0.1.0";
+// Injected by tsup at build time from packages/server/package.json (falls back in tests).
+declare const __NORTHSTAR_VERSION__: string;
+export const VERSION = typeof __NORTHSTAR_VERSION__ !== "undefined" ? __NORTHSTAR_VERSION__ : "0.0.0";
 /** Per-launch identity nonce, returned by /api/health (zombie/stale-server detection). */
 export const NONCE = randomUUID();
 export const STARTED_AT = Date.now();

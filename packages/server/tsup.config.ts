@@ -1,4 +1,7 @@
+import { readFileSync } from "node:fs";
 import { defineConfig } from "tsup";
+
+const version = JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf8")).version;
 
 // Bundle the server to a single ESM file. better-sqlite3 is a native module and
 // must stay external (loaded from node_modules at runtime). Everything else —
@@ -15,6 +18,7 @@ export default defineConfig({
   // dynamic-require / native-loader surprises).
   external: ["better-sqlite3"],
   noExternal: ["@northstar/shared"],
+  define: { __NORTHSTAR_VERSION__: JSON.stringify(version) },
   sourcemap: true,
   clean: true,
   splitting: false,
