@@ -6,7 +6,7 @@ import path from "node:path";
 
 const REPO = "TooSalty0000/northstar";
 const LATEST_URL = `https://api.github.com/repos/${REPO}/releases/latest`;
-const CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6h
+const CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6h background safety-net; manual button is primary
 const FIRST_CHECK_DELAY_MS = 8_000;
 
 export interface UpdateInfo {
@@ -175,7 +175,14 @@ export function initUpdater(getWindow: () => BrowserWindow | null): void {
     }
     return { ok: false };
   });
-  ipcMain.handle("update:check", () => checkForUpdate());
+  // Manual check: surface the result through the same banner the auto-check uses, and
+  // return a small summary so the button can say "up to date" when there's nothing newer.
+  ipcMain.handle("update:check", async () => {
+    const info = await checkForUpdate();
+    const win = getWindow();
+    if (info && win && !win.isDestroyed()) win.webContents.send("update:available", info);
+    return { current: app.getVersion(), update: info };
+  });
   ipcMain.handle("update:download", () => downloadUpdate(getWindow));
   ipcMain.handle("update:install", () => installUpdate());
 

@@ -6,7 +6,7 @@ import { logicalLocalDate, nowIso } from "../time";
 import { emit, rowToSubtask, rowToTask, touch } from "./mappers";
 import { defaultSpaceId } from "./spaces";
 import { repoSpaceId } from "./repos";
-import { createInJira, echoStatusToJira } from "../jira/echo";
+import { createInJira, echoChecklistToJira, echoStatusToJira } from "../jira/echo";
 
 /** Resolve which space a new task belongs to: explicit > repo's space > default. */
 function resolveSpaceId(explicit?: string | null, repo?: string | null): string {
@@ -168,6 +168,7 @@ export function addSubtask(taskId: string, title: string, actor: Actor = "user",
     emit(db, { type: "subtask_added", taskId, subtaskId: sid, actor, repo, payload: { title } });
     touch(db, taskId);
   })();
+  echoChecklistToJira(taskId); // mirror checklist into the Jira description (no-op if unlinked)
   return rowToSubtask(db.prepare(`SELECT * FROM subtasks WHERE id = ?`).get(sid));
 }
 
@@ -182,6 +183,7 @@ export function checkSubtask(taskId: string, subtaskId: string, actor: Actor = "
     emit(db, { type: "subtask_done", taskId, subtaskId, actor, repo });
     touch(db, taskId);
   })();
+  echoChecklistToJira(taskId);
   return getTask(taskId);
 }
 
@@ -193,6 +195,7 @@ export function uncheckSubtask(taskId: string, subtaskId: string, actor: Actor =
     db.prepare(`UPDATE subtasks SET done = 0, done_at = NULL WHERE id = ?`).run(subtaskId);
     touch(db, taskId);
   })();
+  echoChecklistToJira(taskId);
   return getTask(taskId);
 }
 
@@ -202,6 +205,7 @@ export function deleteSubtask(taskId: string, subtaskId: string): Task | null {
     db.prepare(`DELETE FROM subtasks WHERE id = ? AND task_id = ?`).run(subtaskId, taskId);
     touch(db, taskId);
   })();
+  echoChecklistToJira(taskId);
   return getTask(taskId);
 }
 

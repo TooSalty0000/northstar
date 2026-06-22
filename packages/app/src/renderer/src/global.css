@@ -85,6 +85,11 @@ button { font-family: inherit; cursor: pointer; }
 .page-sub { color: var(--muted); font-size: 13px; }
 
 /* ---- today bar (the videogame xp bar) ---- */
+.update-check { font-size: 12px; opacity: 0.75; }
+.update-check:hover { opacity: 1; }
+.update-check.found { color: var(--star); opacity: 1; font-weight: 600; }
+.update-check.uptodate { color: var(--green); }
+.update-check.error { color: var(--rose); }
 .xp-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 22px 24px; box-shadow: var(--shadow); }
 .xp-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
 .xp-label { font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 1.2px; font-weight: 700; }
@@ -103,11 +108,12 @@ button { font-family: inherit; cursor: pointer; }
 }
 .xp-fill.overflow { background: linear-gradient(90deg, var(--green), var(--star) 80%, #ffd874); box-shadow: 0 0 26px rgba(245,185,66,0.6); }
 .xp-fill::after {
-  content: ""; position: absolute; inset: 0;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.25), transparent);
-  transform: translateX(-100%); animation: shimmer 2.4s infinite;
+  content: ""; position: absolute; inset: 0; border-radius: inherit;
+  background: linear-gradient(100deg, transparent 20%, rgba(255,255,255,0.38) 50%, transparent 80%);
+  background-size: 220% 100%;
+  animation: xp-sheen 2.4s linear infinite;
 }
-@keyframes shimmer { to { transform: translateX(100%); } }
+@keyframes xp-sheen { from { background-position: 220% 0; } to { background-position: -220% 0; } }
 .xp-break { display: flex; gap: 18px; margin-top: 14px; font-size: 13px; color: var(--muted); }
 .xp-break .chip b { color: var(--text); }
 .xp-break .s b { color: var(--green); } .xp-break .t b { color: var(--star); } .xp-break .h b { color: var(--rose); }

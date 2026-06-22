@@ -16,25 +16,35 @@ describe("today bar — no failable ceiling", () => {
     expect(t.bar.overflow).toBe(false);
   });
 
-  it("fills toward 100% as planned subtasks complete", () => {
+  it("fill reflects what's done (momentum), not a remaining deficit", () => {
     const task = store.createTask({ title: "X", subtasks: ["a", "b"], focusToday: true });
     let today = getToday();
-    // planned = 2 subtasks (+1 each) + task_completed (+3) = 5
-    expect(today.bar.plannedRemainingUnits).toBe(5);
-    expect(today.bar.fillPct).toBe(0);
+    expect(today.bar.fillPct).toBe(0); // nothing done yet
 
     store.checkSubtask(task.id, task.subtasks![0].id);
     today = getToday();
     expect(today.bar.completedUnits).toBe(1);
-    expect(today.bar.fillPct).toBeCloseTo(1 / 5, 5);
+    // soft curve depends only on completed units: 1 / (1 + 12)
+    expect(today.bar.fillPct).toBeCloseTo(1 / 13, 5);
   });
 
-  it("weights a completed task as +3 and overflows when plan is exhausted", () => {
-    const task = store.createTask({ title: "Y", focusToday: true });
-    store.setStatus(task.id, "done");
+  it("more done = fuller bar, and never recedes when work remains", () => {
+    const a = store.createTask({ title: "A", focusToday: true });
+    const b = store.createTask({ title: "B", subtasks: ["s"], focusToday: true });
+    store.setStatus(a.id, "done"); // +3
+    const before = getToday().bar.fillPct;
+    store.checkSubtask(b.id, b.subtasks![0].id); // +1 more, with an open task still remaining
+    const after = getToday().bar.fillPct;
+    expect(after).toBeGreaterThan(before); // grows with accomplishment, regardless of remaining work
+  });
+
+  it("flags a strong day once enough is accomplished (no ceiling)", () => {
+    for (let i = 0; i < 6; i++) {
+      const t = store.createTask({ title: `t${i}`, focusToday: true });
+      store.setStatus(t.id, "done"); // 6 × 3 = 18 units
+    }
     const today = getToday();
-    expect(today.bar.completedUnits).toBe(3);
-    expect(today.bar.fillPct).toBe(1);
+    expect(today.bar.completedUnits).toBe(18);
     expect(today.bar.overflow).toBe(true);
   });
 

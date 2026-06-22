@@ -17,6 +17,27 @@ export function adfToText(adf: unknown): string {
   return out.join("").replace(/\n{3,}/g, "\n\n").trim();
 }
 
+/** Separates the user's prose from the Northstar-mirrored checklist inside a Jira description. */
+export const CHECKLIST_MARKER = "── Subtasks (Northstar) ──";
+
+/** Strip the mirrored checklist section so local prose stays clean on pull. */
+export function stripChecklist(text: string): string {
+  if (!text) return "";
+  const i = text.indexOf(CHECKLIST_MARKER);
+  return (i === -1 ? text : text.slice(0, i)).trim();
+}
+
+/** Build the Jira description body: user prose + a mirrored checkbox list of subtasks. */
+export function composeJiraDescription(
+  prose: string,
+  subtasks: { title: string; done: number }[],
+): string {
+  const base = stripChecklist(prose);
+  if (!subtasks.length) return base;
+  const lines = subtasks.map((s) => `${s.done ? "☑" : "☐"} ${s.title}`);
+  return `${base ? base + "\n\n" : ""}${CHECKLIST_MARKER}\n${lines.join("\n")}`;
+}
+
 /** Wrap plain text into a minimal ADF document (for push-create). */
 export function textToADF(text: string): unknown {
   const content = (text || "")

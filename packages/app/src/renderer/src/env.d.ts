@@ -25,7 +25,7 @@ declare global {
         creds: { siteUrl: string; email: string; token: string },
       ) => Promise<{ ok: boolean; accountId?: string; displayName?: string; error?: string }>;
       jiraDisconnect: (spaceId: string) => Promise<{ ok: boolean }>;
-      checkForUpdate: () => Promise<UpdateInfo | null>;
+      checkForUpdate: () => Promise<{ current: string; update: UpdateInfo | null }>;
       onUpdateAvailable: (cb: (info: UpdateInfo) => void) => () => void;
       openUpdateUrl: (url: string) => Promise<{ ok: boolean }>;
       downloadUpdate: () => Promise<{ ok: boolean; error?: string }>;

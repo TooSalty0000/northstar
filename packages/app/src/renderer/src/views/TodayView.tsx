@@ -21,7 +21,7 @@ function TodayBar({ bar }: { bar: TodayBarT }) {
       <div className="xp-top">
         <span className="xp-label">Today's progress</span>
         <span className="xp-count">
-          <b>{bar.completedUnits}</b> {bar.overflow ? "✦ overflowing" : `/ ${bar.denominator}`} pts
+          <b>{bar.completedUnits}</b> pts{bar.overflow ? " · ✦ strong day" : ""}
         </span>
       </div>
       <div className="xp-track">

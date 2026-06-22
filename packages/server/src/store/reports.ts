@@ -77,9 +77,12 @@ export function getToday(spaceId?: string): TodayResponse {
   }
 
   const completedUnits = u.units;
-  const denominator = Math.max(completedUnits, plannedRemaining + completedUnits);
-  const fillPct = denominator > 0 ? Math.min(1, completedUnits / denominator) : 0;
-  const overflow = completedUnits > 0 && plannedRemaining === 0;
+  // No max / obligation: the bar reflects what you've DONE (momentum), never a remaining
+  // deficit — so it can never read as "behind". Soft curve approaches full asymptotically.
+  const SOFT_K = 12;
+  const denominator = completedUnits + plannedRemaining; // kept for API compat; not shown as a cap
+  const fillPct = completedUnits > 0 ? completedUnits / (completedUnits + SOFT_K) : 0;
+  const overflow = completedUnits >= 18; // celebratory "strong day" flair (not a ceiling)
 
   return {
     localDate,

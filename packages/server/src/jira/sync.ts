@@ -7,8 +7,10 @@ import { JiraClient, type JiraCreds, JiraError } from "./client";
 import {
   adfToText,
   buildPullJql,
+  composeJiraDescription,
   jiraStatusToNorthstar,
   northstarStatusTarget,
+  stripChecklist,
   textToADF,
   transitionMatches,
 } from "./mapping";
@@ -149,7 +151,7 @@ export async function pull(spaceId: string, _sprintOnly?: boolean): Promise<{ im
     pulledIds.add(numericId);
     const key = iss.key;
     const summary = iss.fields?.summary ?? key;
-    const desc = adfToText(iss.fields?.description);
+    const desc = stripChecklist(adfToText(iss.fields?.description)); // drop our mirrored checklist
     const st = iss.fields?.status;
     const status = jiraStatusToNorthstar(String(st?.id), st?.statusCategory?.key ?? "new", link.reviewStatusId);
     const assignee = iss.fields?.assignee?.displayName ?? null;
@@ -271,12 +273,15 @@ export async function createIssueForTask(taskId: string): Promise<void> {
   const link = links.getLink(t.space_id);
   if (!link || !links.getSession(t.space_id)) return; // not connected → stays local
   const issueTypeId = link.issueTypeId ?? (await resolveIssueType(t.space_id));
+  const subs = db
+    .prepare(`SELECT title, done FROM subtasks WHERE task_id=? ORDER BY position, rowid`)
+    .all(taskId) as any[];
   try {
     const c = clientFor(t.space_id);
     const fields: any = {
       project: { key: link.projectKey },
       summary: t.title,
-      description: textToADF(t.description || ""),
+      description: textToADF(composeJiraDescription(t.description || "", subs)),
       issuetype: issueTypeId ? { id: issueTypeId } : { name: "Task" },
     };
     if (link.accountId) fields.assignee = { accountId: link.accountId };
@@ -302,6 +307,35 @@ export async function createIssueForTask(taskId: string): Promise<void> {
   } catch (e: any) {
     if (e instanceof JiraError && e.kind === "auth") links.setAuthState(t.space_id, "revoked");
     db.prepare(`UPDATE tasks SET sync_state='error' WHERE id=?`).run(taskId);
+  }
+}
+
+/**
+ * Push a linked task's subtask checklist into its Jira issue description (the mirror).
+ * Idempotent — recomputes the whole description from local prose + current subtasks.
+ */
+export async function pushDescription(taskId: string): Promise<void> {
+  const db = getDb();
+  const t = db
+    .prepare(`SELECT id, space_id, description, external_id, external_provider FROM tasks WHERE id=?`)
+    .get(taskId) as any;
+  if (!t || t.external_provider !== "jira" || !t.external_id) return;
+  if (!links.getLink(t.space_id) || !links.getSession(t.space_id)) {
+    db.prepare(`UPDATE tasks SET desc_dirty=1 WHERE id=?`).run(taskId);
+    return;
+  }
+  const subs = db
+    .prepare(`SELECT title, done FROM subtasks WHERE task_id=? ORDER BY position, rowid`)
+    .all(taskId) as any[];
+  try {
+    const body = composeJiraDescription(t.description || "", subs);
+    await clientFor(t.space_id).put("v3", `/issue/${t.external_id}`, {
+      fields: { description: textToADF(body) },
+    });
+    db.prepare(`UPDATE tasks SET desc_dirty=0 WHERE id=?`).run(taskId);
+  } catch (e: any) {
+    if (e instanceof JiraError && e.kind === "auth") links.setAuthState(t.space_id, "revoked");
+    db.prepare(`UPDATE tasks SET desc_dirty=1 WHERE id=?`).run(taskId); // retried by pushPending
   }
 }
 
@@ -340,6 +374,12 @@ export async function pushPending(spaceId: string): Promise<void> {
     )
     .all(spaceId) as any[];
   for (const r of dirty) await pushStatus(r.id);
+  const descDirty = db
+    .prepare(
+      `SELECT id FROM tasks WHERE space_id=? AND external_provider='jira' AND external_id IS NOT NULL AND desc_dirty=1`,
+    )
+    .all(spaceId) as any[];
+  for (const r of descDirty) await pushDescription(r.id);
 }
 
 /** Auto-sync every connected space (called by the timer): push pending, then pull. */

@@ -24,7 +24,8 @@ const api = {
   ): Promise<{ ok: boolean; accountId?: string; displayName?: string; error?: string }> =>
     ipcRenderer.invoke("jira:connect", spaceId, creds),
   jiraDisconnect: (spaceId: string): Promise<{ ok: boolean }> => ipcRenderer.invoke("jira:disconnect", spaceId),
-  checkForUpdate: () => ipcRenderer.invoke("update:check"),
+  checkForUpdate: (): Promise<{ current: string; update: unknown | null }> =>
+    ipcRenderer.invoke("update:check"),
   onUpdateAvailable: (cb: (info: unknown) => void) => {
     const handler = (_e: unknown, info: unknown) => cb(info);
     ipcRenderer.on("update:available", handler);

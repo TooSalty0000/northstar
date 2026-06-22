@@ -136,6 +136,10 @@ const MIGRATIONS: Array<(db: DB) => void> = [
   (db) => {
     db.exec(`ALTER TABLE tasks ADD COLUMN assignee_name TEXT;`);
   },
+  // migration 6 — retry flag for pushing the subtask checklist into the Jira description
+  (db) => {
+    db.exec(`ALTER TABLE tasks ADD COLUMN desc_dirty INTEGER NOT NULL DEFAULT 0;`);
+  },
 ];
 
 function applyPragmas(db: DB) {

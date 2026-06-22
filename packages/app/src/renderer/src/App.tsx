@@ -10,6 +10,7 @@ import { ConnectionsView } from "./views/ConnectionsView";
 import { TaskDrawer } from "./components/TaskDrawer";
 import { SpaceSwitcher } from "./components/SpaceSwitcher";
 import { UpdateBanner } from "./components/UpdateBanner";
+import { UpdateCheck } from "./components/UpdateCheck";
 
 const NAV: { id: View; label: string; ico: string }[] = [
   { id: "today", label: "Today", ico: "✦" },
@@ -62,6 +63,7 @@ export function App() {
           </button>
         ))}
         <div className="spacer" />
+        <UpdateCheck />
         <div className="status-pill">
           <span className={`dot ${status}`} />
           {STATUS_TEXT[status]}
