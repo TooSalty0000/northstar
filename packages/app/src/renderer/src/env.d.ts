@@ -30,7 +30,7 @@ declare global {
       openUpdateUrl: (url: string) => Promise<{ ok: boolean }>;
       downloadUpdate: () => Promise<{ ok: boolean; error?: string }>;
       installUpdate: () => Promise<{ ok: boolean; error?: string }>;
-      onUpdateProgress: (cb: (p: { percent: number }) => void) => () => void;
+      onUpdateProgress: (cb: (p: { percent: number; received?: number; total?: number }) => void) => () => void;
       closeHotfix: () => void;
       navigate: (cb: (route: string) => void) => () => void;
     };

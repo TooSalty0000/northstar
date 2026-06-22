@@ -2,6 +2,7 @@ import { app, shell, ipcMain, type BrowserWindow } from "electron";
 import { spawn, execFileSync } from "node:child_process";
 import { createWriteStream, existsSync, mkdirSync, readdirSync, rmSync, writeFileSync, chmodSync } from "node:fs";
 import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
 import path from "node:path";
 
 const REPO = "TooSalty0000/northstar";
@@ -93,18 +94,39 @@ async function downloadUpdate(getWindow: () => BrowserWindow | null): Promise<{ 
   mkdirSync(dir, { recursive: true });
   const zipPath = path.join(dir, "update.zip");
 
+  const controller = new AbortController();
+  let received = 0;
+  let lastTick = Date.now();
+  // Stall watchdog: if no bytes arrive for 30s, abort so the UI shows an actionable error
+  // (with "Open release") instead of sitting frozen at 0% forever.
+  const watchdog = setInterval(() => {
+    if (Date.now() - lastTick > 30_000) controller.abort();
+  }, 5_000);
   try {
-    const res = await fetch(latest.zipUrl, { headers: { "User-Agent": "northstar-app" } });
-    if (!res.ok || !res.body) return { ok: false, error: `Download failed (${res.status}).` };
+    const res = await fetch(latest.zipUrl, {
+      headers: { "User-Agent": "northstar-app", Accept: "application/octet-stream" },
+      redirect: "follow",
+      signal: controller.signal,
+    });
+    if (!res.ok || !res.body) return { ok: false, error: `Download failed (HTTP ${res.status}).` };
     const total = Number(res.headers.get("content-length")) || 0;
-    let received = 0;
     const out = createWriteStream(zipPath);
-    for await (const chunk of Readable.fromWeb(res.body as any)) {
-      out.write(chunk);
-      received += (chunk as Buffer).length;
-      if (total) win()?.webContents.send("update:progress", { percent: Math.round((received / total) * 100) });
-    }
-    await new Promise<void>((r, j) => out.end((e?: Error | null) => (e ? j(e) : r())));
+    // pipeline() honors backpressure and resolves only when the file is fully flushed.
+    await pipeline(
+      Readable.fromWeb(res.body as any),
+      async function* (source: AsyncIterable<Buffer>) {
+        for await (const chunk of source) {
+          received += chunk.length;
+          lastTick = Date.now();
+          // percent when size is known; otherwise stream received bytes so the bar still moves
+          const percent = total ? Math.min(99, Math.round((received / total) * 100)) : 0;
+          win()?.webContents.send("update:progress", { percent, received, total });
+          yield chunk;
+        }
+      },
+      out,
+    );
+    win()?.webContents.send("update:progress", { percent: 100, received, total: total || received });
 
     // extract with ditto (correct for .app zips); strip quarantine on the result
     const extractDir = path.join(dir, "extracted");
@@ -122,7 +144,11 @@ async function downloadUpdate(getWindow: () => BrowserWindow | null): Promise<{ 
     stagedAppPath = staged;
     return { ok: true };
   } catch (e: any) {
+    if (controller.signal.aborted)
+      return { ok: false, error: "Download stalled. Check your connection, or use Open release." };
     return { ok: false, error: e?.message ?? "Download failed." };
+  } finally {
+    clearInterval(watchdog);
   }
 }
 

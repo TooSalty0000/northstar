@@ -7,6 +7,8 @@ export function UpdateBanner() {
   const [dismissed, setDismissed] = useState(false);
   const [phase, setPhase] = useState<Phase>("idle");
   const [percent, setPercent] = useState(0);
+  const [received, setReceived] = useState(0);
+  const [total, setTotal] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -15,7 +17,11 @@ export function UpdateBanner() {
       setDismissed(false);
       setPhase("idle");
     });
-    const offP = window.northstar?.onUpdateProgress((p) => setPercent(p.percent));
+    const offP = window.northstar?.onUpdateProgress((p) => {
+      setPercent(p.percent);
+      setReceived(p.received ?? 0);
+      setTotal(p.total ?? 0);
+    });
     return () => {
       off?.();
       offP?.();
@@ -68,9 +74,15 @@ export function UpdateBanner() {
 
       {phase === "downloading" && (
         <>
-          <span style={{ flex: 1 }}>Downloading v{info.version}… {percent}%</span>
+          <span style={{ flex: 1 }}>
+            Downloading v{info.version}…{" "}
+            {total ? `${percent}%` : received ? `${(received / 1e6).toFixed(1)} MB` : "starting…"}
+          </span>
           <div className="update-progress">
-            <div style={{ width: `${percent}%` }} />
+            <div
+              className={total ? "" : "indeterminate"}
+              style={total ? { width: `${percent}%` } : undefined}
+            />
           </div>
         </>
       )}
