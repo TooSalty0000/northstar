@@ -1,7 +1,7 @@
 {
   "name": "northstar",
   "private": true,
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Local-first accomplishment tracker that Claude keeps current as a side effect of real work.",
   "workspaces": [
     "packages/shared",

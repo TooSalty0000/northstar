@@ -112,7 +112,13 @@ async function downloadUpdate(getWindow: () => BrowserWindow | null): Promise<{ 
     const appName = readdirSync(extractDir).find((n) => n.endsWith(".app"));
     if (!appName) return { ok: false, error: "Update archive had no .app." };
     const staged = path.join(extractDir, appName);
-    execFileSync("xattr", ["-dr", "com.apple.quarantine", staged]);
+    // Best-effort: xattr exits non-zero on the bundle's dangling symlinks (npm/npx/…),
+    // but still clears quarantine on the real files. Don't let that abort the update.
+    try {
+      execFileSync("xattr", ["-dr", "com.apple.quarantine", staged], { stdio: "ignore" });
+    } catch {
+      /* harmless symlink warnings */
+    }
     stagedAppPath = staged;
     return { ok: true };
   } catch (e: any) {

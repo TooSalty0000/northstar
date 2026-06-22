@@ -93,7 +93,8 @@ export function JiraPanel() {
           </div>
           {link.boardId && (
             <div className="page-sub" style={{ marginTop: 8 }}>
-              Mirrors your active sprint (issues assigned to you). New tasks here are created in Jira.
+              Mirrors the whole active sprint (auto-syncs every ~5 min + on demand). Status changes and new
+              tasks you create here push to Jira instantly.
             </div>
           )}
           {busy && busy.startsWith("✓") && <div style={{ color: "var(--green)", marginTop: 8 }}>{busy}</div>}
