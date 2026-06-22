@@ -7,6 +7,7 @@ import { createTray, refreshTray } from "./tray";
 import { addRepo, removeRepo } from "./repoSetup";
 import { connectJira, disconnectJira, restoreJiraSessions } from "./jiraCredentials";
 import { initUpdater } from "./updater";
+import { getCloseAction, setCloseAction } from "./prefs";
 
 const supervisor = new ServerSupervisor();
 let mainWindow: BrowserWindow | null = null;
@@ -25,11 +26,42 @@ function showMain() {
 
 function wireMainWindow() {
   mainWindow!.on("close", (e) => {
-    if (!isQuitting) {
-      e.preventDefault();
-      mainWindow!.hide();
-    }
+    if (isQuitting) return; // a real quit is already underway — let it close
+    e.preventDefault();
+    void handleWindowClose();
   });
+}
+
+/**
+ * On window close, ask whether to keep the background server running (hide to the menu
+ * bar) or quit entirely. Honors a remembered choice; quitting tears down the server.
+ */
+async function handleWindowClose() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  const pref = getCloseAction();
+  if (pref === "hide") return mainWindow.hide();
+  if (pref === "quit") return app.quit();
+
+  const { dialog } = await import("electron");
+  const { response, checkboxChecked } = await dialog.showMessageBox(mainWindow, {
+    type: "question",
+    buttons: ["Hide to menu bar", "Quit Northstar", "Cancel"],
+    defaultId: 0,
+    cancelId: 2,
+    title: "Close Northstar",
+    message: "Hide the window, or quit completely?",
+    detail:
+      "Hide to menu bar keeps the background server running so Claude can keep logging your work. " +
+      "Quit Northstar stops the server too — Claude won't be able to reach it until you reopen the app.",
+    checkboxLabel: "Remember my choice",
+    checkboxChecked: false,
+  });
+
+  if (response === 2) return; // Cancel — stay open
+  const action = response === 1 ? "quit" : "hide";
+  if (checkboxChecked) setCloseAction(action);
+  if (action === "quit") app.quit();
+  else mainWindow.hide();
 }
 
 function openHotfix() {
