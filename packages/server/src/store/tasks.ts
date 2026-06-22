@@ -112,16 +112,28 @@ export interface CreateTaskInput {
 
 const normTitle = (s: string) => s.toLowerCase().trim().replace(/\s+/g, " ");
 
-/** Find an open (non-archived, non-done) task in the space whose title matches/overlaps. */
+const DEDUPE_DONE_WINDOW_MS = 7 * 24 * 60 * 60 * 1000; // a done task older than this can legitimately recur
+
+/**
+ * Find a non-archived task in the space whose title matches/overlaps. An OPEN match wins
+ * immediately; otherwise a recently-COMPLETED match is reused too — this stops an agent
+ * from creating a fresh "todo" duplicate of work it just logged as done (and vice-versa).
+ */
 export function findDuplicateInSpace(spaceId: string, title: string): Task | null {
   const t = normTitle(title);
   if (t.length < 4) return null;
+  const cutoff = Date.now() - DEDUPE_DONE_WINDOW_MS;
+  let recentDone: Task | null = null;
   for (const c of listTasks({ spaceId })) {
-    if (c.status === "done") continue;
     const ct = normTitle(c.title);
-    if (ct === t || (Math.min(ct.length, t.length) >= 4 && (ct.includes(t) || t.includes(ct)))) return c;
+    const overlaps =
+      ct === t || (Math.min(ct.length, t.length) >= 4 && (ct.includes(t) || t.includes(ct)));
+    if (!overlaps) continue;
+    if (c.status !== "done") return c; // open/in-progress/in-review duplicate — reuse now
+    const at = Date.parse(c.completedAt ?? c.updatedAt ?? "");
+    if (!recentDone && Number.isFinite(at) && at >= cutoff) recentDone = c; // remember as fallback
   }
-  return null;
+  return recentDone;
 }
 
 export function createTask(input: CreateTaskInput): Task {
@@ -283,7 +295,9 @@ export function archiveTask(taskId: string, actor: Actor = "user"): void {
   const db = getDb();
   const repo = taskRepo(taskId);
   db.transaction(() => {
-    db.prepare(`UPDATE tasks SET archived = 1, focus_date = NULL WHERE id = ?`).run(taskId);
+    // archived_sticky=1 → a manual archive that the Jira pull must respect (never un-archive),
+    // even while the issue is still in the active sprint. Purely local; needs no Jira perms.
+    db.prepare(`UPDATE tasks SET archived = 1, archived_sticky = 1, focus_date = NULL WHERE id = ?`).run(taskId);
     emit(db, { type: "task_archived", taskId, actor, repo });
   })();
 }

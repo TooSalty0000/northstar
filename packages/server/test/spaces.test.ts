@@ -63,4 +63,11 @@ describe("spaces", () => {
     const c = store.createTask({ title: "wikidata" }); // UI path (no dedupe) still creates
     expect(c.id).not.toBe(a.id);
   });
+
+  it("dedupe also reuses a recently-completed task (no duplicate todo)", () => {
+    const a = store.createTask({ title: "web_search reads full page content" });
+    store.setStatus(a.id, "done");
+    const b = store.createTask({ title: "web_search reads full page content", dedupe: true });
+    expect(b.id).toBe(a.id); // reused the just-done task instead of spawning a fresh todo
+  });
 });

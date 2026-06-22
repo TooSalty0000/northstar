@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { _setTestDb, getDb } from "../src/db";
 import { defaultSpaceId } from "../src/store/spaces";
-import { createTask, listTasks } from "../src/store/tasks";
+import { archiveTask, createTask, listTasks } from "../src/store/tasks";
 import * as jiraLinks from "../src/jira/links";
 import * as jiraSync from "../src/jira/sync";
 import { nowIso } from "../src/time";
@@ -181,6 +181,15 @@ describe("jira push-create + status echo", () => {
     const task = createTask({ title: "offline", spaceId });
     await jiraSync.createIssueForTask(task.id);
     expect(issuesPosted.length).toBe(0);
+  });
+
+  it("a manual archive sticks across a pull even while the issue is still in the sprint", async () => {
+    const spaceId = connect();
+    await jiraSync.pull(spaceId); // imports SANC-1
+    const id = listTasks({ spaceId }).find((t) => t.externalId === "SANC-1")!.id;
+    archiveTask(id); // user hides it locally (no Jira delete needed)
+    await jiraSync.pull(spaceId); // SANC-1 still returned by the sprint query
+    expect((getDb().prepare(`SELECT archived FROM tasks WHERE id=?`).get(id) as any).archived).toBe(1);
   });
 
   it("pushStatus transitions a linked task on completion", async () => {

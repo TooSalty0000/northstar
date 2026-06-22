@@ -163,14 +163,16 @@ export async function pull(spaceId: string, _sprintOnly?: boolean): Promise<{ im
 
     if (existing) {
       // read title/desc/sprint as truth; only overwrite status if no local push is pending.
-      // archived=0 so an issue returning to the sprint is un-archived.
+      // Un-archive a returning issue UNLESS the user manually archived it (archived_sticky).
       if (existing.sync_dirty) {
         db.prepare(
-          `UPDATE tasks SET title=?, description=?, external_id=?, external_url=?, sprint_name=?, assignee_name=?, archived=0, last_synced_at=? WHERE id=?`,
+          `UPDATE tasks SET title=?, description=?, external_id=?, external_url=?, sprint_name=?, assignee_name=?,
+             archived = CASE WHEN archived_sticky=1 THEN archived ELSE 0 END, last_synced_at=? WHERE id=?`,
         ).run(summary, desc, key, url, sprintName, assignee, Date.now(), existing.id);
       } else {
         db.prepare(
-          `UPDATE tasks SET title=?, description=?, status=?, external_id=?, external_url=?, sprint_name=?, assignee_name=?, archived=0, sync_state='synced', last_synced_at=?,
+          `UPDATE tasks SET title=?, description=?, status=?, external_id=?, external_url=?, sprint_name=?, assignee_name=?,
+             archived = CASE WHEN archived_sticky=1 THEN archived ELSE 0 END, sync_state='synced', last_synced_at=?,
              completed_at = CASE WHEN ?='done' THEN COALESCE(completed_at, ?) ELSE NULL END WHERE id=?`,
         ).run(summary, desc, status, key, url, sprintName, assignee, Date.now(), status, ts, existing.id);
       }

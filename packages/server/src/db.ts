@@ -145,6 +145,11 @@ const MIGRATIONS: Array<(db: DB) => void> = [
   (db) => {
     db.exec(`UPDATE space_jira_links SET issue_type_id = NULL;`);
   },
+  // migration 8 — a user's manual archive must stick: the Jira pull must not un-archive it
+  // just because the issue is still in the active sprint.
+  (db) => {
+    db.exec(`ALTER TABLE tasks ADD COLUMN archived_sticky INTEGER NOT NULL DEFAULT 0;`);
+  },
 ];
 
 function applyPragmas(db: DB) {
