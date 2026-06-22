@@ -9,8 +9,11 @@ export default defineConfig({
   target: "node22",
   platform: "node",
   outExtension: () => ({ js: ".mjs" }),
+  // Externalize all real npm deps (express, zod, MCP SDK, better-sqlite3) — they ship as a
+  // real node_modules alongside the entry (staged by prepare-runtime). Only the TS workspace
+  // package is bundled in. This runs the sidecar as an ordinary Node app (no esbuild
+  // dynamic-require / native-loader surprises).
   external: ["better-sqlite3"],
-  // tsup externalizes deps by default; force the TS workspace pkg to be bundled.
   noExternal: ["@northstar/shared"],
   sourcemap: true,
   clean: true,

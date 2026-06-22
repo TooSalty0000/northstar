@@ -27,9 +27,13 @@ MCP server. And it can two-way **mirror your team's Jira sprint** if you want.
 
 ## Install (macOS)
 
-1. Download the latest **`Northstar-x.y.z.dmg`** from the [Releases page](https://github.com/TooSalty0000/northstar/releases).
-2. Open the dmg and drag **Northstar** to Applications.
-3. First launch: the build is **unsigned**, so macOS Gatekeeper will block it. **Right-click the app → Open → Open** (only needed once), or `System Settings → Privacy & Security → Open Anyway`.
+1. Download the latest **`NORTHSTAR-x.y.z-arm64.dmg`** from the [Releases page](https://github.com/TooSalty0000/northstar/releases).
+2. Open the dmg and **drag NORTHSTAR to your Applications folder** (don't run it from the dmg).
+3. The build is **unsigned**, so macOS quarantines it and may say **"NORTHSTAR is damaged and can't be opened."** That's the quarantine flag, not actual damage. Clear it once in Terminal:
+   ```bash
+   xattr -dr com.apple.quarantine /Applications/NORTHSTAR.app
+   ```
+   Then open NORTHSTAR normally. *(Right-click → Open does **not** reliably clear the "damaged" state — use the command above.)*
 
 Northstar lives in your **menu bar** (✦). Closing the window doesn't quit it — use **Quit** from the menu-bar icon.
 

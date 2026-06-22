@@ -40,7 +40,9 @@ extraResources:
 mac:
   category: public.app-category.productivity
   target:
-    - target: dmg
+    - target: dmg # first install
+      arch: [arm64]
+    - target: zip # used by the in-app self-updater (easy to extract programmatically)
       arch: [arm64]
   identity: '-'            # ad-hoc sign: arm64 main binary needs SOME signature to run
   hardenedRuntime: false   # unsigned + hardenedRuntime:true can block launch
