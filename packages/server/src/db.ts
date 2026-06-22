@@ -140,6 +140,11 @@ const MIGRATIONS: Array<(db: DB) => void> = [
   (db) => {
     db.exec(`ALTER TABLE tasks ADD COLUMN desc_dirty INTEGER NOT NULL DEFAULT 0;`);
   },
+  // migration 7 — clear cached issue types so the corrected resolver (which never picks
+  // an Epic) re-resolves to a standard Task/Story on the next sync.
+  (db) => {
+    db.exec(`UPDATE space_jira_links SET issue_type_id = NULL;`);
+  },
 ];
 
 function applyPragmas(db: DB) {

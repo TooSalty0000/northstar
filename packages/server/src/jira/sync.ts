@@ -244,15 +244,26 @@ export async function pushStatus(taskId: string): Promise<void> {
   }
 }
 
-/** Resolve + store the project's default (non-subtask) issue type for push-create. */
+/**
+ * Resolve + store the project's default issue type for push-create. We want a STANDARD
+ * work item (Jira hierarchyLevel 0: Task/Story/Bug) — never a Sub-task (level < 0) and
+ * never an Epic (level > 0, a container). Older Jira omits hierarchyLevel, so we also
+ * exclude epics/sub-tasks by name and only fall back to the first standard type.
+ */
 export async function resolveIssueType(spaceId: string): Promise<string | null> {
   const link = links.getLink(spaceId);
   if (!link) return null;
   try {
     const proj = await clientFor(spaceId).get("v3", `/project/${encodeURIComponent(link.projectKey)}`);
-    const types: any[] = (proj.issueTypes ?? []).filter((t: any) => !t.subtask);
+    const all: any[] = proj.issueTypes ?? [];
+    const isEpic = (t: any) => t.hierarchyLevel > 0 || /^epic$/i.test(t.name);
+    const isStandard = (t: any) => !t.subtask && t.hierarchyLevel !== -1 && !isEpic(t);
+    const pool = all.filter(isStandard);
+    const fallback = pool.length ? pool : all.filter((t) => !t.subtask && !isEpic(t));
     const pick =
-      types.find((t) => /^task$/i.test(t.name)) ?? types.find((t) => /^story$/i.test(t.name)) ?? types[0];
+      fallback.find((t) => /^task$/i.test(t.name)) ??
+      fallback.find((t) => /^story$/i.test(t.name)) ??
+      fallback[0];
     if (pick) {
       links.setIssueType(spaceId, String(pick.id));
       return String(pick.id);
@@ -270,8 +281,12 @@ export async function createIssueForTask(taskId: string): Promise<void> {
     .prepare(`SELECT id, space_id, title, description, external_id FROM tasks WHERE id=?`)
     .get(taskId) as any;
   if (!t || t.external_id) return; // gone or already linked
+  if (!links.getLink(t.space_id) || !links.getSession(t.space_id)) return; // not connected → stays local
+  // Resolve board/active-sprint/issue-type FIRST — otherwise a not-yet-resolved board
+  // (boardId still null) makes the issue land in the backlog instead of the active sprint.
+  await ensureLinkConfig(t.space_id);
   const link = links.getLink(t.space_id);
-  if (!link || !links.getSession(t.space_id)) return; // not connected → stays local
+  if (!link) return;
   const issueTypeId = link.issueTypeId ?? (await resolveIssueType(t.space_id));
   const subs = db
     .prepare(`SELECT title, done FROM subtasks WHERE task_id=? ORDER BY position, rowid`)

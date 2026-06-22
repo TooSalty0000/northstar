@@ -44,7 +44,13 @@ beforeEach(async () => {
           },
         ]);
       if (/\/rest\/api\/3\/project\/SANC(\?|$)/.test(url) && m === "GET")
-        return send({ issueTypes: [{ id: "10001", name: "Task", subtask: false }, { id: "10002", name: "Sub-task", subtask: true }] });
+        return send({
+          issueTypes: [
+            { id: "10000", name: "Epic", subtask: false, hierarchyLevel: 1 }, // listed first — must NOT be picked
+            { id: "10001", name: "Task", subtask: false, hierarchyLevel: 0 },
+            { id: "10002", name: "Sub-task", subtask: true, hierarchyLevel: -1 },
+          ],
+        });
       if (url.includes("/rest/api/3/search/jql") && m === "POST")
         return send({
           issues: [
@@ -145,6 +151,20 @@ describe("jira push-create + status echo", () => {
     expect(issuesPosted[0].fields.assignee).toEqual({ accountId: "acc1" });
     expect(sprintAdds[0]).toEqual({ issues: ["SANC-NEW"] });
     expect((getDb().prepare(`SELECT external_id FROM tasks WHERE id=?`).get(task.id) as any).external_id).toBe("SANC-NEW");
+  });
+
+  it("adds a new issue to the active sprint even with no prior pull (board not yet resolved)", async () => {
+    // Reproduces the pushPending-before-pull ordering: the link has NO boardId yet.
+    const spaceId = defaultSpaceId();
+    const siteUrl = `http://127.0.0.1:${port}`;
+    jiraLinks.upsertLink({ spaceId, siteUrl, email: "me@x.com", accountId: "acc1", projectKey: "SANC", projectId: "1" });
+    const task = createTask({ title: "presprint", spaceId }); // created while disconnected → local
+    jiraLinks.setSession(spaceId, { siteUrl, email: "me@x.com", token: "tok" });
+
+    await jiraSync.createIssueForTask(task.id); // NO pull first — must self-heal the board internally
+
+    expect(sprintAdds[0]).toEqual({ issues: ["SANC-NEW"] }); // landed in the sprint, not the backlog
+    expect((getDb().prepare(`SELECT sprint_name FROM tasks WHERE id=?`).get(task.id) as any).sprint_name).toBe("Sprint 7");
   });
 
   it("createTask auto-pushes when the Space is connected", async () => {
