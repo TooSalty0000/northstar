@@ -26,7 +26,7 @@ function buildServer(): McpServer {
       },
     },
     async (args) => {
-      const t = store.createTask({ ...args, actor: "claude" });
+      const t = store.createTask({ ...args, actor: "claude", dedupe: true });
       return ok({ id: t.id, title: t.title, status: t.status, subtasks: t.subtasks?.length ?? 0 });
     },
   );

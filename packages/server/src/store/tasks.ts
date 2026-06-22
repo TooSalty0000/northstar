@@ -107,6 +107,21 @@ export interface CreateTaskInput {
   subtasks?: string[];
   focusToday?: boolean;
   actor?: Actor;
+  dedupe?: boolean; // (Claude/MCP) reuse an existing open task with a matching title
+}
+
+const normTitle = (s: string) => s.toLowerCase().trim().replace(/\s+/g, " ");
+
+/** Find an open (non-archived, non-done) task in the space whose title matches/overlaps. */
+export function findDuplicateInSpace(spaceId: string, title: string): Task | null {
+  const t = normTitle(title);
+  if (t.length < 4) return null;
+  for (const c of listTasks({ spaceId })) {
+    if (c.status === "done") continue;
+    const ct = normTitle(c.title);
+    if (ct === t || (Math.min(ct.length, t.length) >= 4 && (ct.includes(t) || t.includes(ct)))) return c;
+  }
+  return null;
 }
 
 export function createTask(input: CreateTaskInput): Task {
@@ -116,6 +131,12 @@ export function createTask(input: CreateTaskInput): Task {
   const ts = nowIso();
   const focusDate = input.focusToday ? logicalLocalDate() : null;
   const spaceId = resolveSpaceId(input.spaceId, input.repo);
+
+  // Server-side dedupe (used by Claude/MCP): don't create a near-duplicate of an open task.
+  if (input.dedupe) {
+    const dup = findDuplicateInSpace(spaceId, input.title);
+    if (dup) return dup;
+  }
   db.transaction(() => {
     db.prepare(
       `INSERT INTO tasks (id, title, description, status, repo, space_id, focus_date, created_at, updated_at, last_touched_at)

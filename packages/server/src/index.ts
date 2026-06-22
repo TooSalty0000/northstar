@@ -105,10 +105,11 @@ function main() {
   }, 6 * 60 * 60 * 1000);
   backupTimer.unref();
 
-  // auto-pull connected Jira spaces (manual "Pull now" also exists)
+  // auto-pull connected Jira spaces frequently so the board stays ~live
+  // (Jira can't webhook a localhost app, so fast polling is the live mechanism).
   jiraTimer = setInterval(() => {
     pullAllConnected().catch(() => {});
-  }, 5 * 60 * 1000);
+  }, 20 * 1000);
   jiraTimer.unref();
 
   watchParentDeath();

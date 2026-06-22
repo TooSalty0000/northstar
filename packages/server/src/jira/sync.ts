@@ -321,13 +321,34 @@ export async function pushLocalTasks(spaceId: string): Promise<{ pushed: number 
   return { pushed };
 }
 
-/** Auto-pull every connected space (called by the timer). */
+/**
+ * Push everything pending for a connected space: create Jira issues for any unlinked
+ * tasks, and push status for any linked tasks marked dirty. This is the safety net that
+ * makes pushes automatic even if the instant create/echo missed (e.g. session not yet
+ * loaded at the moment of creation) — no manual "Push local tasks" needed.
+ */
+export async function pushPending(spaceId: string): Promise<void> {
+  if (!links.getSession(spaceId)) return;
+  const db = getDb();
+  const unlinked = db
+    .prepare(`SELECT id FROM tasks WHERE space_id=? AND archived=0 AND external_id IS NULL`)
+    .all(spaceId) as any[];
+  for (const r of unlinked) await createIssueForTask(r.id);
+  const dirty = db
+    .prepare(
+      `SELECT id FROM tasks WHERE space_id=? AND external_provider='jira' AND external_id IS NOT NULL AND sync_dirty=1`,
+    )
+    .all(spaceId) as any[];
+  for (const r of dirty) await pushStatus(r.id);
+}
+
+/** Auto-sync every connected space (called by the timer): push pending, then pull. */
 export async function pullAllConnected(): Promise<void> {
   for (const spaceId of links.connectedSpaceIds()) {
-    const link = links.getLink(spaceId);
-    if (!link) continue;
+    if (!links.getLink(spaceId)) continue;
     try {
-      await pull(spaceId, false);
+      await pushPending(spaceId); // push local creations/status first
+      await pull(spaceId); // then mirror the sprint back
     } catch {
       /* surfaced via auth_state/sync_state; timer keeps going */
     }

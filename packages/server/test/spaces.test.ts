@@ -55,4 +55,12 @@ describe("spaces", () => {
   it("refuses to delete the default space", () => {
     expect(spaces.deleteSpace(spaces.defaultSpaceId()).ok).toBe(false);
   });
+
+  it("dedupe reuses an existing open task with an overlapping title", () => {
+    const a = store.createTask({ title: "wikidata implementation" });
+    const b = store.createTask({ title: "wikidata", dedupe: true }); // Claude/MCP path
+    expect(b.id).toBe(a.id); // reused, not duplicated
+    const c = store.createTask({ title: "wikidata" }); // UI path (no dedupe) still creates
+    expect(c.id).not.toBe(a.id);
+  });
 });
