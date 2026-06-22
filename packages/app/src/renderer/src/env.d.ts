@@ -8,6 +8,7 @@ declare global {
     name: string;
     notes: string;
     url: string;
+    zipUrl: string | null;
     publishedAt: string;
   }
   interface Window {
@@ -27,6 +28,9 @@ declare global {
       checkForUpdate: () => Promise<UpdateInfo | null>;
       onUpdateAvailable: (cb: (info: UpdateInfo) => void) => () => void;
       openUpdateUrl: (url: string) => Promise<{ ok: boolean }>;
+      downloadUpdate: () => Promise<{ ok: boolean; error?: string }>;
+      installUpdate: () => Promise<{ ok: boolean; error?: string }>;
+      onUpdateProgress: (cb: (p: { percent: number }) => void) => () => void;
       closeHotfix: () => void;
       navigate: (cb: (route: string) => void) => () => void;
     };

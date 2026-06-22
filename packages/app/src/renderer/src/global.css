@@ -234,6 +234,8 @@ input.inp:focus, textarea.inp:focus { border-color: var(--blue); }
 }
 .update-banner .btn { background: #fff; color: #1f6feb; border: none; font-weight: 700; }
 .update-banner .icon-btn { color: #fff; }
+.update-progress { width: 160px; height: 7px; border-radius: 999px; background: rgba(255,255,255,0.3); overflow: hidden; }
+.update-progress > div { height: 100%; background: #fff; border-radius: 999px; transition: width .2s; }
 
 /* ---- jira badges ---- */
 .jira-tag {

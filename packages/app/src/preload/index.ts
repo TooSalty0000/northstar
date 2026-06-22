@@ -31,6 +31,13 @@ const api = {
     return () => ipcRenderer.removeListener("update:available", handler);
   },
   openUpdateUrl: (url: string) => ipcRenderer.invoke("update:open", url),
+  downloadUpdate: (): Promise<{ ok: boolean; error?: string }> => ipcRenderer.invoke("update:download"),
+  installUpdate: (): Promise<{ ok: boolean; error?: string }> => ipcRenderer.invoke("update:install"),
+  onUpdateProgress: (cb: (p: { percent: number }) => void) => {
+    const handler = (_e: unknown, p: { percent: number }) => cb(p);
+    ipcRenderer.on("update:progress", handler);
+    return () => ipcRenderer.removeListener("update:progress", handler);
+  },
   closeHotfix: () => ipcRenderer.send("hotfix:close"),
   navigate: (cb: (route: string) => void) => {
     const handler = (_e: unknown, route: string) => cb(route);
