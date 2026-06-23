@@ -38,11 +38,19 @@ export function UpdateBanner() {
     }
     setError(null);
     setPercent(0);
+    setReceived(0);
+    setTotal(0);
     setPhase("downloading");
-    const r = await window.northstar!.downloadUpdate();
-    if (r.ok) setPhase("ready");
-    else {
-      setError(r.error ?? "Download failed");
+    try {
+      const r = await window.northstar!.downloadUpdate();
+      if (r.ok) setPhase("ready");
+      else {
+        setError(r.error ?? "Download failed");
+        setPhase("error");
+      }
+    } catch (e: any) {
+      // A rejected IPC must never leave the banner frozen at "starting".
+      setError(e?.message ?? "Update failed unexpectedly");
       setPhase("error");
     }
   };

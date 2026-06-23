@@ -1,9 +1,22 @@
 import { app, shell, ipcMain, type BrowserWindow } from "electron";
-import { spawn, execFileSync } from "node:child_process";
-import { createWriteStream, existsSync, mkdirSync, readdirSync, rmSync, writeFileSync, chmodSync } from "node:fs";
+import { spawn, execFileSync, execFile } from "node:child_process";
+import { promisify } from "node:util";
+import { createWriteStream, existsSync, mkdirSync, readdirSync, rmSync, writeFileSync, chmodSync, appendFileSync } from "node:fs";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import path from "node:path";
+
+const execFileAsync = promisify(execFile);
+
+/** Append a line to userData/update.log so update failures are diagnosable after the fact. */
+function ulog(msg: string): void {
+  try {
+    const line = `[${new Date().toISOString()}] ${msg}\n`;
+    appendFileSync(path.join(app.getPath("userData"), "update.log"), line);
+  } catch {
+    /* logging must never throw */
+  }
+}
 
 const REPO = "TooSalty0000/northstar";
 const LATEST_URL = `https://api.github.com/repos/${REPO}/releases/latest`;
@@ -87,29 +100,38 @@ function appBundlePath(): string {
 
 /** Download the update .zip, extract it, strip quarantine, stage the new .app. */
 async function downloadUpdate(getWindow: () => BrowserWindow | null): Promise<{ ok: boolean; error?: string }> {
-  if (!latest?.zipUrl) return { ok: false, error: "No downloadable build for this release." };
   const win = () => getWindow();
-  const dir = path.join(app.getPath("temp"), "northstar-update");
-  rmSync(dir, { recursive: true, force: true });
-  mkdirSync(dir, { recursive: true });
-  const zipPath = path.join(dir, "update.zip");
-
   const controller = new AbortController();
   let received = 0;
+  let firstByte = false;
   let lastTick = Date.now();
-  // Stall watchdog: if no bytes arrive for 30s, abort so the UI shows an actionable error
-  // (with "Open release") instead of sitting frozen at 0% forever.
+  // Watchdog: abort if the connection never delivers a first byte, or stalls mid-stream.
+  // Either way the UI gets an actionable error instead of sitting frozen at 0% forever.
   const watchdog = setInterval(() => {
-    if (Date.now() - lastTick > 30_000) controller.abort();
+    const idle = Date.now() - lastTick;
+    if ((!firstByte && idle > 20_000) || idle > 30_000) controller.abort();
   }, 5_000);
   try {
+    if (!latest?.zipUrl) return { ok: false, error: "No downloadable build for this release." };
+    ulog(`download start: ${latest.zipUrl}`);
+    // Everything that can throw is INSIDE this try, so the IPC always resolves with a
+    // result object (never rejects) — a rejection would freeze the renderer at "starting".
+    const dir = path.join(app.getPath("temp"), "northstar-update");
+    rmSync(dir, { recursive: true, force: true });
+    mkdirSync(dir, { recursive: true });
+    const zipPath = path.join(dir, "update.zip");
+
     const res = await fetch(latest.zipUrl, {
       headers: { "User-Agent": "northstar-app", Accept: "application/octet-stream" },
       redirect: "follow",
       signal: controller.signal,
     });
-    if (!res.ok || !res.body) return { ok: false, error: `Download failed (HTTP ${res.status}).` };
+    if (!res.ok || !res.body) {
+      ulog(`fetch not ok: ${res.status}`);
+      return { ok: false, error: `Download failed (HTTP ${res.status}).` };
+    }
     const total = Number(res.headers.get("content-length")) || 0;
+    ulog(`fetch ok: total=${total}`);
     const out = createWriteStream(zipPath);
     // pipeline() honors backpressure and resolves only when the file is fully flushed.
     await pipeline(
@@ -117,6 +139,7 @@ async function downloadUpdate(getWindow: () => BrowserWindow | null): Promise<{ 
       async function* (source: AsyncIterable<Buffer>) {
         for await (const chunk of source) {
           received += chunk.length;
+          firstByte = true;
           lastTick = Date.now();
           // percent when size is known; otherwise stream received bytes so the bar still moves
           const percent = total ? Math.min(99, Math.round((received / total) * 100)) : 0;
@@ -127,25 +150,37 @@ async function downloadUpdate(getWindow: () => BrowserWindow | null): Promise<{ 
       out,
     );
     win()?.webContents.send("update:progress", { percent: 100, received, total: total || received });
+    ulog(`download complete: ${received} bytes`);
 
-    // extract with ditto (correct for .app zips); strip quarantine on the result
+    // extract with ditto (correct for .app zips); strip quarantine on the result.
+    // Async (execFile) so the main process / UI never blocks during the ~5s extraction.
     const extractDir = path.join(dir, "extracted");
-    execFileSync("ditto", ["-x", "-k", zipPath, extractDir]);
+    await execFileAsync("ditto", ["-x", "-k", zipPath, extractDir]);
     const appName = readdirSync(extractDir).find((n) => n.endsWith(".app"));
     if (!appName) return { ok: false, error: "Update archive had no .app." };
     const staged = path.join(extractDir, appName);
+    ulog(`extracted: ${appName}`);
     // Best-effort: xattr exits non-zero on the bundle's dangling symlinks (npm/npx/…),
     // but still clears quarantine on the real files. Don't let that abort the update.
     try {
-      execFileSync("xattr", ["-dr", "com.apple.quarantine", staged], { stdio: "ignore" });
+      await execFileAsync("xattr", ["-dr", "com.apple.quarantine", staged]);
     } catch {
       /* harmless symlink warnings */
     }
     stagedAppPath = staged;
+    ulog("staged OK");
     return { ok: true };
   } catch (e: any) {
-    if (controller.signal.aborted)
-      return { ok: false, error: "Download stalled. Check your connection, or use Open release." };
+    if (controller.signal.aborted) {
+      ulog(`aborted (firstByte=${firstByte}, received=${received})`);
+      return {
+        ok: false,
+        error: firstByte
+          ? "Download stalled mid-way. Check your connection, or use Open release."
+          : "Couldn't reach the download server. Check your connection, or use Open release.",
+      };
+    }
+    ulog(`error: ${e?.name}: ${e?.message}`);
     return { ok: false, error: e?.message ?? "Download failed." };
   } finally {
     clearInterval(watchdog);
