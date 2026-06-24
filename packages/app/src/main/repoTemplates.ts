@@ -13,6 +13,10 @@ export const MCP_JSON = `${JSON.stringify(
   2,
 )}\n`;
 
+// Bump SKILL_VERSION whenever SKILL_MD changes — registered repos re-sync to the newer
+// version automatically on app launch (see resyncRegisteredRepos in repoSetup).
+export const SKILL_VERSION = 2;
+
 export const SKILL_MD = `---
 name: northstar-logging
 description: >-
@@ -21,6 +25,7 @@ description: >-
   PR, or handle a hotfix — so the board stays current without anyone tending it.
 allowed-tools:
   - mcp__northstar__create_task
+  - mcp__northstar__get_task
   - mcp__northstar__add_subtask
   - mcp__northstar__check_subtask
   - mcp__northstar__set_status
@@ -47,10 +52,15 @@ Northstar app happens to be running.
   \`subtasks\` checklist of the planned steps).
 
 ## While working
-- Call \`northstar_check_subtask\` the **moment** you finish each step.
+- Call \`northstar_check_subtask\` the **moment** you finish each step. It needs the
+  \`subtaskId\` — \`create_task\` and \`get_task\` both return subtask ids; \`list_tasks\`
+  does **not**. If you're resuming a task you didn't create this session, call
+  \`northstar_get_task\` first to fetch its checklist ids, then check off what's done.
 - Call \`northstar_set_status\` to move the task: \`in_progress\` when you start,
   \`in_review\` when you open a PR / hand off, \`done\` when merged or verified.
-- Add steps you discover with \`northstar_add_subtask\`.
+- Add steps you discover with \`northstar_add_subtask\` (it returns the new id).
+- Don't leave a task at 0% when work shipped: reconcile its checklist with
+  \`get_task\` + \`check_subtask\`, and set \`done\` once it's actually complete.
 
 ## Hotfixes / interruptions
 - Unplanned urgent work → \`northstar_log_hotfix\` (it records an already-completed
@@ -59,4 +69,6 @@ Northstar app happens to be running.
 ## Tone
 - Stay invisible. At most a brief "(logged to Northstar)" once. Never describe the
   tool's internals and never announce that the server is unavailable.
+
+<!-- northstar-skill-version: 2 -->
 `;

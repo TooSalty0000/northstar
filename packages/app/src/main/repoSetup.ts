@@ -6,9 +6,23 @@ import { MCP_URL, resolveApiBase } from "@northstar/shared";
 // .mcp.json written into work repos always targets the PRODUCTION endpoint (MCP_URL,
 // :7777) — that's the daily-driver app. The registry fetch talks to THIS running app.
 const API_BASE = resolveApiBase();
-import { SKILL_MD } from "./repoTemplates";
+import { SKILL_MD, SKILL_VERSION } from "./repoTemplates";
 
 const NORTHSTAR_ENTRY = { type: "http", url: MCP_URL };
+const SKILL_REL = path.join(".claude", "skills", "northstar-logging", "SKILL.md");
+
+/** Write SKILL.md only when it's missing or an older version — keeps it current after updates. */
+function upsertSkill(dir: string): void {
+  const skillFile = path.join(dir, SKILL_REL);
+  let current: number | null = null;
+  if (fs.existsSync(skillFile)) {
+    const m = fs.readFileSync(skillFile, "utf8").match(/northstar-skill-version:\s*(\d+)/);
+    current = m ? Number(m[1]) : 0; // an unstamped (v1) skill counts as 0 → gets refreshed
+  }
+  if (current === SKILL_VERSION) return;
+  fs.mkdirSync(path.dirname(skillFile), { recursive: true });
+  fs.writeFileSync(skillFile, SKILL_MD);
+}
 
 /**
  * Add the northstar server to a repo's .mcp.json WITHOUT clobbering existing servers.
@@ -81,9 +95,7 @@ export async function addRepo(spaceId?: string): Promise<{ ok: boolean; dir?: st
       await dialog.showMessageBox({ type: "error", title: "Couldn't update .mcp.json", message: merged.error! });
       return { ok: false, error: merged.error };
     }
-    const skillDir = path.join(dir, ".claude", "skills", "northstar-logging");
-    fs.mkdirSync(skillDir, { recursive: true });
-    fs.writeFileSync(path.join(skillDir, "SKILL.md"), SKILL_MD);
+    upsertSkill(dir);
     await fetch(`${API_BASE}/api/repos`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -139,4 +151,28 @@ export async function removeRepo(repo: {
   }
   await fetch(`${API_BASE}/api/repos/${repo.id}`, { method: "DELETE" }).catch(() => {});
   return { ok: true, deletedFiles };
+}
+
+/**
+ * On launch (once the server is up): bring every registered repo's northstar config and
+ * logging skill up to date with this app version. Silent + best-effort — a moved/deleted
+ * repo or an unreachable server is simply skipped. This is how skill updates propagate.
+ */
+export async function resyncRegisteredRepos(): Promise<void> {
+  try {
+    const res = await fetch(`${API_BASE}/api/repos`);
+    if (!res.ok) return;
+    const repos = (await res.json()) as Array<{ path?: string }>;
+    for (const r of repos) {
+      if (!r?.path || !fs.existsSync(r.path)) continue; // repo moved/deleted → skip
+      try {
+        upsertMcpJson(r.path); // merge-safe; never clobbers other servers
+        upsertSkill(r.path); // version-gated rewrite
+      } catch {
+        /* one bad repo never blocks the rest */
+      }
+    }
+  } catch {
+    /* server not ready yet / no repos → ignore, next launch retries */
+  }
 }

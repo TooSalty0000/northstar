@@ -4,7 +4,7 @@ const MCP_URL = resolveMcpUrl();
 import { ServerSupervisor } from "./supervisor";
 import { createMainWindow, createHotfixWindow } from "./windows";
 import { createTray, refreshTray } from "./tray";
-import { addRepo, removeRepo } from "./repoSetup";
+import { addRepo, removeRepo, resyncRegisteredRepos } from "./repoSetup";
 import { connectJira, disconnectJira, restoreJiraSessions } from "./jiraCredentials";
 import { initUpdater } from "./updater";
 import { getCloseAction, setCloseAction } from "./prefs";
@@ -101,9 +101,17 @@ function scheduleJiraRestore() {
   restoreTimer = setTimeout(() => restoreJiraSessions().catch(() => {}), 2000);
 }
 
+let skillsSynced = false;
 function broadcastStatus(status: string) {
   refreshTray();
-  if (status === "running") scheduleJiraRestore();
+  if (status === "running") {
+    scheduleJiraRestore();
+    // once per launch: bring registered repos' skill + .mcp.json up to this app version
+    if (!skillsSynced) {
+      skillsSynced = true;
+      setTimeout(() => resyncRegisteredRepos().catch(() => {}), 2500);
+    }
+  }
   for (const w of BrowserWindow.getAllWindows()) {
     if (!w.isDestroyed()) w.webContents.send("server:status", status);
   }

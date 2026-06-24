@@ -27,7 +27,37 @@ function buildServer(): McpServer {
     },
     async (args) => {
       const t = store.createTask({ ...args, actor: "claude", dedupe: true });
-      return ok({ id: t.id, title: t.title, status: t.status, subtasks: t.subtasks?.length ?? 0 });
+      // Return subtask IDs (not just a count) so they can be checked off without a re-fetch.
+      return ok({
+        id: t.id,
+        title: t.title,
+        status: t.status,
+        subtasks: (t.subtasks ?? []).map((s) => ({ id: s.id, title: s.title, done: s.done })),
+      });
+    },
+  );
+
+  server.registerTool(
+    "northstar_get_task",
+    {
+      title: "Get task",
+      description:
+        "Fetch one task with its full subtask checklist INCLUDING subtask ids. Call this to get the ids needed for check_subtask when resuming work you didn't create this session (list_tasks omits them).",
+      inputSchema: { taskId: z.string() },
+      annotations: { readOnlyHint: true },
+    },
+    async (args) => {
+      const t = store.getTask(args.taskId);
+      if (!t) return ok({ error: "not found" });
+      return ok({
+        id: t.id,
+        title: t.title,
+        status: t.status,
+        pct: t.pct,
+        done: t.doneCount,
+        total: t.total,
+        subtasks: (t.subtasks ?? []).map((s) => ({ id: s.id, title: s.title, done: s.done })),
+      });
     },
   );
 
@@ -102,7 +132,8 @@ function buildServer(): McpServer {
     "northstar_list_tasks",
     {
       title: "List tasks",
-      description: "Read-only list/lookup of tasks. Pass query to dedupe before creating a new task.",
+      description:
+        "Read-only list/lookup of tasks (id, title, status, pct). Pass query to dedupe before creating a new task. Subtask ids are NOT included here — call get_task for a task's checklist ids.",
       inputSchema: {
         status: z.enum(TASK_STATUSES as [string, ...string[]]).optional(),
         repo: z.string().optional(),
